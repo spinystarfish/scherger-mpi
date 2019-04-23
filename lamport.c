@@ -4,6 +4,16 @@
 
 /** Global Variables **/
 
+/** Function Definitions **/
+
+void Report_End(int rank, int clock);
+
+void Report_Exec(int rank, int clock);
+
+void Report_Rec(int rank, int sendrank, char* msg, int clock);
+
+void Report_Send(int rank, int receiverank, char* msg, int clock);
+
 
 /***********************/
 
@@ -20,4 +30,20 @@ int main(int argc, char* argv[]){
   }
 
 
+}
+
+void Report_End(int rank, int clock) {
+  printf("\t[%d]: Logical Clock = %d\n", rank, clock);
+}
+
+void Report_Exec(int rank, int clock) {
+  printf("\t[%d]: Execution Event: Logical Clock = %d\n", rank, clock);
+}
+
+void Report_Rec(int rank, int sendrank, char* msg, int clock) {
+  printf("\t[%d]: Message Received from %d: Message >%s<: Logical Clock = %d\n", rank, sendrank, msg, clock);
+}
+
+void Report_Send(int rank, int receiverank, char* msg, int clock) {
+  printf("\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
 }
