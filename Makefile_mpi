@@ -12,7 +12,7 @@
 CC = mpicc
 RUN = mpirun
 CFLAGS = 
-RFLAGS = -np
+RUNFLAGS = -np
 LIBS = 
 RM = /bin/rm
 RMFLAGS = -f
