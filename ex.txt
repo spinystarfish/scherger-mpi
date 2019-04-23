@@ -1,0 +1,4 @@
+3
+exec 1
+send 1 2 "silly message"
+end
