@@ -22,9 +22,6 @@ int main(int argc, char* argv[]){
 
   /*For each line (a.k.a each event)*/
   while(scanf("%s", &event) == 1) {
-    /* Parse Method */
-
-
     scanf("%d", &sendID);
     scanf("%d", &recieveID);
     scanf(" %[^\n]", msg);
