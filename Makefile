@@ -27,4 +27,4 @@ clean:
 	$(RM) $(RMFLAGS) *.o *~ $(EXE)
 
 test1:
-	$(RUN) $(RUNFLAGS) 3 $(EXE) < test1.txt
+	$(RUN) $(RUNFLAGS) 4 $(EXE) < test1.txt
