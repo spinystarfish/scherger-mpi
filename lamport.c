@@ -37,24 +37,25 @@ int main(int argc, char* argv[]){
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  scanf("%d", &size);
-  printf("Number of processes: %d\n", size);
 
   /* THE MANAGER PROCESS */
   if(rank == 0) {
-    /*
+    scanf("%d", &size);
+    printf("Number of processes: %d\n", size);
+    
     for(int i = 0; i < 2; i++) {
-      char* tmp;
-      int d = scanf("%s", &tmp);
-      printf("%d: %s.\n", d, tmp);
+      char tmp[128];
+      scanf("%s", &tmp);
+      printf("%s\n", tmp);
     }
-
+    /*
     for(int i = 0; i < 1; i++) {
       char* event;
       int d = scanf("%s", &event);
       printf("%d: %s.\n", d, event);
     }
     */
+    /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
   }
   
   MPI_Finalize();
