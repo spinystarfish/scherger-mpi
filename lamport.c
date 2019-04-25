@@ -4,6 +4,12 @@
 
 /** Global Variables **/
 
+struct Send_Inst {
+  int sender;
+  int receiver;
+  char msg[256];
+};
+
 /** Function Definitions **/
 
 void Report_End(int rank, int clock);
