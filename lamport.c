@@ -12,6 +12,8 @@ struct Send_Inst {
 
 /** Function Definitions **/
 
+int Read_Exec();
+
 void Report_End(int rank, int clock);
 
 void Report_Exec(int rank, int clock);
@@ -25,29 +27,43 @@ void Report_Send(int rank, int receiverank, char* msg, int clock);
 
 int main(int argc, char* argv[]){
   /*Local Variables */
-  
+
+  int rank;
   int size;
-  char* event[10];
-  int sendID;
-  int recieveID;
-  char* msg;
-  /* THE MANAGER PROCESS */
-  /* Can use this for debugging/validating purposes*/
+  MPI_Status status;
+
+  MPI_Init(&argc, &argv);
+
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
   scanf("%d", &size);
-  printf("[0]: There are %d processes in the system\n", size);
+  printf("Number of processes: %d\n", size);
 
-  /*For each line (a.k.a each event)*/
-  while(scanf("%s", &event) == 1) {
-    /* Parse Method */
+  /* THE MANAGER PROCESS */
+  if(rank == 0) {
+    /*
+    for(int i = 0; i < 2; i++) {
+      char* tmp;
+      int d = scanf("%s", &tmp);
+      printf("%d: %s.\n", d, tmp);
+    }
 
-
-    scanf("%d", &sendID);
-    scanf("%d", &recieveID);
-    scanf(" %[^\n]", msg);
-    printf("An event has occured!: %s %d %d %s\n", event, sendID, recieveID, msg);
+    for(int i = 0; i < 1; i++) {
+      char* event;
+      int d = scanf("%s", &event);
+      printf("%d: %s.\n", d, event);
+    }
+    */
   }
-
   
+  MPI_Finalize();
+}
+
+int Read_Exec() {
+  int d;
+  scanf("%d", &d);
+  return d;
 }
 
 void Report_End(int rank, int clock) {
