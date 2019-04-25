@@ -43,7 +43,7 @@ int main(int argc, char* argv[]){
   /* THE MANAGER PROCESS */
   if(rank == 0) {
     scanf("%d", &size);
-    printf("Number of processes: %d\n", size);
+    printf("[0]: There are %d processes in the system\n", size);
 
     struct Event e = Read_Event();
     while(e.type == 0 || e.type == 1) {
@@ -55,7 +55,8 @@ int main(int argc, char* argv[]){
       }
       e = Read_Event();
     }
-    
+
+    printf("[0]: Simulation ending\n");
     
     /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
   }
