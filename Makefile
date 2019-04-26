@@ -28,3 +28,7 @@ clean:
 
 test1:
 	$(RUN) $(RUNFLAGS) 4 $(EXE) < test1.txt
+
+test2:
+	$(RUN) $(RUNFLAGS) 4 $(EXE) < test2.txt
+
