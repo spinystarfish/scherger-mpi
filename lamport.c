@@ -3,16 +3,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* TAGS, all of which are totally arbitrary because I came up with them on the spot
+ * 40 => Single integer specifying length of char message to follow. If -1, end
+ * 55 => Character message of length specified by preceding message.
+ * 70 => Single integer specifying the ending clock of a process.
+ */
+
 /** Global Variables **/
 
 struct Event {
-  int type; //0 => exec; 1 => send; 2 => end; 3 => error
+  int type; 
+  /*0 => exec
+   * 1 => send
+   * 2 => end
+   * 3 => error
+   */
   int sender;
   int receiver;
   char msg[256];
 };
 
 /** Function Definitions **/
+
+struct Event Deserialize_Event(char* serial, int len);
+
+void Serialize_Event(struct Event e, char* serial, int* len);
 
 struct Event Read_Event();
 
@@ -45,49 +60,107 @@ int main(int argc, char* argv[]){
     scanf("%d", &sim_size);
     fprintf(stdout, "[0]: There are %d processes in the system\n", size);
 
-    //Currently, simply reads in events and echos to stdout
+    //Reads in events and sends events to appropriate processes
     struct Event e = Read_Event();
     while(e.type == 0 || e.type == 1) {
+      char serial[262];
+      int slen;
+      Serialize_Event(e, serial, &slen);
+      //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
+      MPI_Send(&slen, 1, MPI_INT, e.sender, 40, MPI_COMM_WORLD);//send length
+      MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
+      /*
       if(e.type == 0) {
         //fprintf(stdout, "\tExec: %d\n", e.sender);
         MPI_Send(&e.type, 1, MPI_INT, e.sender, 55, MPI_COMM_WORLD);
       }
-      else {
+      else if(e.type == 1) {
         fprintf(stdout, "\tNOT Send: %d %d %s\n", e.sender, e.receiver, e.msg);
       }
+      */
       e = Read_Event();
     }
 
-    fprintf(stdout, "[0]: Simulation ending\n");
     for(int p = 1; p < size; p++) {
-      int end = 2;
-      MPI_Send(&end, 1, MPI_INT, p, 55, MPI_COMM_WORLD);
+      int end = -1;
+      MPI_Send(&end, 1, MPI_INT, p, 40, MPI_COMM_WORLD);
       int lclock;
-      MPI_Recv(&lclock, 1, MPI_INT, p, 55, MPI_COMM_WORLD, &status);
+      MPI_Recv(&lclock, 1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
+      if(p == 1) {
+        fprintf(stdout, "[0]: Simulation ending\n");
+      }
       Report_End(p, lclock);
     }
     
   } else {
-    /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
     int clock = 0;
-    int etype = -1;
-    while(1) {
-      //Receive message, print repeat
-      MPI_Recv(&etype, 1, MPI_INT, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
-      if(etype == 0) {//EXEC
+    while(1) {//Receive message, print repeat
+      int ilen;
+      MPI_Recv(&ilen, 1, MPI_INT, MPI_ANY_SOURCE, 40, MPI_COMM_WORLD, &status);
+      if(ilen == -1) {//end
+        break;
+      }
+      char input[ilen];
+      MPI_Recv(&input, ilen, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
+      //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
+      struct Event e = Deserialize_Event(input, ilen);
+      if(e.type == 0) {//EXEC
         Report_Exec(rank, ++clock);
       }
-      else if(etype == 1) {//SEND
+      else if(e.type == 1) {//SEND
         //TODO send message to another process
       }
-      else if(etype == 2) {//END
+      else if(e.type == 2) {//END
+        fprintf(stdout, "How did we get here?\n");
         break;
       }
     }
-    MPI_Send(&clock, 1, MPI_INT, 0, 55, MPI_COMM_WORLD);
+    MPI_Send(&clock, 1, MPI_INT, 0, 70, MPI_COMM_WORLD);
   }
   
   MPI_Finalize();
+}
+
+/*
+ * Deserialize_Event
+ * Takes a serialized event and its length, returns
+ * the deserialized Event struct. 
+ */
+struct Event Deserialize_Event(char* serial, int len) {
+  struct Event e;
+  e.type = atoi(serial);
+  if(e.type == 0) {//EXEC "t|s"
+    e.sender = atoi(serial+2);
+    e.receiver = -1;
+  }
+  else if(e.type == 1) {//SEND "t|s|r|m"
+    e.sender = atoi(serial+2);
+    e.receiver = atoi(serial+4);
+    sprintf(e.msg, "%s\0", serial+6);
+  }
+  
+  return e;
+}
+
+/*
+ * Serialize_Event
+ * Given an Event struct, serialize it into a char*
+ * (serial) with discovered length (len). Serial
+ * must have memory allocated already [262].
+ */
+void Serialize_Event(struct Event e, char* serial, int* len) {
+  sprintf(serial, "%d|", e.type);
+  if(e.type == 0) {//EXEC "t|s"
+    sprintf(serial+2, "%d\0", e.sender);
+    *len = 4;
+    return;
+  }
+  else if(e.type == 1) {//SEND "t|s|r|m"
+    sprintf(serial+2, "%d|", e.sender);
+    sprintf(serial+4, "%d|", e.receiver);
+    sprintf(serial+6, "%s\0", e.msg);
+    *len = 7 + strlen(e.msg);
+  }
 }
 
 /*
@@ -116,9 +189,12 @@ struct Event Read_Event() {
     e.type = 1;
     scanf("%d", &e.sender);
     scanf("%d", &e.receiver);
-    scanf("%[^\n]", &e.msg);
+    char tmp;
+    scanf("%c", &tmp);//skip a space
+    scanf("%c", &tmp);//skip starting "
+    scanf("%[^\"]", &e.msg);
+    scanf("%c", &tmp);//skip ending "
     return e;
-    //TODO Read the message to be sent
   }
   else if( !strcmp(etype, "end") ) {//if type == end
     e.type = 2;
