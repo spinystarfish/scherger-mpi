@@ -50,6 +50,7 @@ int main(int argc, char* argv[]){
     while(e.type == 0 || e.type == 1) {
       if(e.type == 0) {
         //fprintf(stdout, "\tExec: %d\n", e.sender);
+        MPI_Send(&e.type, 1, MPI_INT, e.sender, 55, MPI_COMM_WORLD);
       }
       else {
         fprintf(stdout, "\tNOT Send: %d %d %s\n", e.sender, e.receiver, e.msg);
@@ -58,10 +59,32 @@ int main(int argc, char* argv[]){
     }
 
     fprintf(stdout, "[0]: Simulation ending\n");
+    for(int p = 1; p < size; p++) {
+      int end = 2;
+      MPI_Send(&end, 1, MPI_INT, p, 55, MPI_COMM_WORLD);
+      int lclock;
+      MPI_Recv(&lclock, 1, MPI_INT, p, 55, MPI_COMM_WORLD, &status);
+      Report_End(p, lclock);
+    }
     
   } else {
     /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
-    
+    int clock = 0;
+    int etype = -1;
+    while(1) {
+      //Receive message, print repeat
+      MPI_Recv(&etype, 1, MPI_INT, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
+      if(etype == 0) {//EXEC
+        Report_Exec(rank, ++clock);
+      }
+      else if(etype == 1) {//SEND
+        //TODO send message to another process
+      }
+      else if(etype == 2) {//END
+        break;
+      }
+    }
+    MPI_Send(&clock, 1, MPI_INT, 0, 55, MPI_COMM_WORLD);
   }
   
   MPI_Finalize();
