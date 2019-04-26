@@ -40,11 +40,11 @@ int main(int argc, char* argv[]){
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 
-  /* THE MANAGER PROCESS */
-  if(rank == 0) {
+  if(rank == 0) {//Manager Process
     scanf("%d", &size);
     printf("[0]: There are %d processes in the system\n", size);
 
+    //Currently, simply reads in events and echos to stdout
     struct Event e = Read_Event();
     while(e.type == 0 || e.type == 1) {
       if(e.type == 0) {
@@ -58,26 +58,37 @@ int main(int argc, char* argv[]){
 
     printf("[0]: Simulation ending\n");
     
+  } else {
     /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
+    
   }
   
   MPI_Finalize();
 }
 
+/*
+ * Read_Event
+ * Takes the next line of stdin and saves the details in
+ * an event struct. If a part of the event struct is not 
+ * needed, then it is either initialized to -1 or left null.
+ */
 struct Event Read_Event() {
   struct Event e;
   e.sender = -1;
   e.receiver = -1;
   
-  char ev[10];
-  scanf("%s", &ev); //read event type
+  char etype[10];
+  scanf("%s", &etype); //read event type
   
-  if( !strcmp(ev, "exec") ) {
+  if( !strcmp(etype, "exec") ) {//if type == exec
     e.type = 0;
+    /* Sender is an imporper name here. It is simply the process
+     * which will be simulation an instruction execution.
+     */
     scanf("%d", &e.sender);
     return e;
   }
-  else if( !strcmp(ev, "send") ){
+  else if( !strcmp(etype, "send") ){//if type == send
     e.type = 1;
     scanf("%d", &e.sender);
     scanf("%d", &e.receiver);
@@ -85,29 +96,52 @@ struct Event Read_Event() {
     return e;
     //TODO Read the message to be sent
   }
-  else if( !strcmp(ev, "end") ) {
+  else if( !strcmp(etype, "end") ) {//if type == end
     e.type = 2;
     return e;
   }
-  else {
+  else {//if type not recognized
+    /* This should never be triggered given proper input.
+     * If input is fine, we have a problem elsewhere.
+     */
     e.type = 3;
     printf("Event type not recognized.\n");
     return e;
   }
 }
 
+/*
+ * Report_End
+ * A standard print of final logical clock status
+ * for a particular process. 
+ */
 void Report_End(int rank, int clock) {
   printf("\t[%d]: Logical Clock = %d\n", rank, clock);
 }
 
+/*
+ * Report_Exec
+ * A standard print of logical clock status upon
+ * simulating an instruction execution.
+ */
 void Report_Exec(int rank, int clock) {
   printf("\t[%d]: Execution Event: Logical Clock = %d\n", rank, clock);
 }
 
+/*
+ * Report_Rec
+ * A standard print of logical clock status upon
+ * simulating a message receive.
+ */
 void Report_Rec(int rank, int sendrank, char* msg, int clock) {
   printf("\t[%d]: Message Received from %d: Message >%s<: Logical Clock = %d\n", rank, sendrank, msg, clock);
 }
 
+/*
+ * Report_Send
+ * A standard print of logical clock status upon
+ * simulating a message send.
+ */
 void Report_Send(int rank, int receiverank, char* msg, int clock) {
   printf("\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
 }
