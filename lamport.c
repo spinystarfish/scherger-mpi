@@ -41,22 +41,23 @@ int main(int argc, char* argv[]){
 
 
   if(rank == 0) {//Manager Process
-    scanf("%d", &size);
-    printf("[0]: There are %d processes in the system\n", size);
+    int sim_size;
+    scanf("%d", &sim_size);
+    fprintf(stdout, "[0]: There are %d processes in the system\n", size);
 
     //Currently, simply reads in events and echos to stdout
     struct Event e = Read_Event();
     while(e.type == 0 || e.type == 1) {
       if(e.type == 0) {
-	printf("\tExec: %d\n", e.sender);
+        //fprintf(stdout, "\tExec: %d\n", e.sender);
       }
       else {
-	printf("\tSend: %d %d %s\n", e.sender, e.receiver, e.msg);
+        fprintf(stdout, "\tNOT Send: %d %d %s\n", e.sender, e.receiver, e.msg);
       }
       e = Read_Event();
     }
 
-    printf("[0]: Simulation ending\n");
+    fprintf(stdout, "[0]: Simulation ending\n");
     
   } else {
     /** In child processes, while loop. MSG RECV - if die tag exit, otherwise do stuff **/
@@ -105,7 +106,7 @@ struct Event Read_Event() {
      * If input is fine, we have a problem elsewhere.
      */
     e.type = 3;
-    printf("Event type not recognized.\n");
+    fprintf(stderr, "Event type not recognized.\n");
     return e;
   }
 }
@@ -116,7 +117,7 @@ struct Event Read_Event() {
  * for a particular process. 
  */
 void Report_End(int rank, int clock) {
-  printf("\t[%d]: Logical Clock = %d\n", rank, clock);
+  fprintf(stdout, "\t[%d]: Logical Clock = %d\n", rank, clock);
 }
 
 /*
@@ -125,7 +126,7 @@ void Report_End(int rank, int clock) {
  * simulating an instruction execution.
  */
 void Report_Exec(int rank, int clock) {
-  printf("\t[%d]: Execution Event: Logical Clock = %d\n", rank, clock);
+  fprintf(stdout, "\t[%d]: Execution Event: Logical Clock = %d\n", rank, clock);
 }
 
 /*
@@ -134,7 +135,7 @@ void Report_Exec(int rank, int clock) {
  * simulating a message receive.
  */
 void Report_Rec(int rank, int sendrank, char* msg, int clock) {
-  printf("\t[%d]: Message Received from %d: Message >%s<: Logical Clock = %d\n", rank, sendrank, msg, clock);
+  fprintf(stdout, "\t[%d]: Message Received from %d: Message >%s<: Logical Clock = %d\n", rank, sendrank, msg, clock);
 }
 
 /*
@@ -143,5 +144,5 @@ void Report_Rec(int rank, int sendrank, char* msg, int clock) {
  * simulating a message send.
  */
 void Report_Send(int rank, int receiverank, char* msg, int clock) {
-  printf("\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
+  fprintf(stdout, "\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
 }
