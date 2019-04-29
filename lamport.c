@@ -55,7 +55,7 @@ int main(int argc, char* argv[]){
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 
-  if(rank == 0) {//Manager Process
+  if(rank == 0) { //Manager Process
     int sim_size;
     scanf("%d", &sim_size);
     fprintf(stdout, "[0]: There are %d processes in the system\n", size);
@@ -67,9 +67,13 @@ int main(int argc, char* argv[]){
       int slen;
       Serialize_Event(e, serial, &slen);
       //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
+      
+      //KENNY: We don't need to do this, its optional. I can explain. 
       MPI_Send(&slen, 1, MPI_INT, e.sender, 40, MPI_COMM_WORLD);//send length
+      
       MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
       /*
+      //KENNY: I'd rather have the simluation processes do the printing	
       if(e.type == 0) {
         //fprintf(stdout, "\tExec: %d\n", e.sender);
         MPI_Send(&e.type, 1, MPI_INT, e.sender, 55, MPI_COMM_WORLD);
@@ -80,7 +84,8 @@ int main(int argc, char* argv[]){
       */
       e = Read_Event();
     }
-
+    //SIMULATION ENDING
+    //print out logical clock values
     for(int p = 1; p < size; p++) {
       int end = -1;
       MPI_Send(&end, 1, MPI_INT, p, 40, MPI_COMM_WORLD);
@@ -92,29 +97,46 @@ int main(int argc, char* argv[]){
       Report_End(p, lclock);
     }
     
+    //Simulation proccess
   } else {
     int clock = 0;
-    while(1) {//Receive message, print repeat
+    //While Simulation is Running
+    while(1) {
+      //KENNY: Also part of the optional, not neccesary mention I made above
       int ilen;
       MPI_Recv(&ilen, 1, MPI_INT, MPI_ANY_SOURCE, 40, MPI_COMM_WORLD, &status);
-      if(ilen == -1) {//end
+      if(ilen == -1) { //end
+	//Quit the Simulation
         break;
       }
+      //Recieving Message...
       char input[ilen];
       MPI_Recv(&input, ilen, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
       //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
       struct Event e = Deserialize_Event(input, ilen);
-      if(e.type == 0) {//EXEC
+      //Exec Intruction Recieved
+      if(e.type == 0) {
         Report_Exec(rank, ++clock);
       }
-      else if(e.type == 1) {//SEND
+      //Send Instruction Recieved
+      else if(e.type == 1) {
         //TODO send message to another process
+	//Recieved from Manager Process
+	//if(e.sender == rank) {
+	//  Report_Send(rank, e.reciever , e.msg, clock++);
+	//}
+	//Recieved from Simulation Process
+        //else {
+	//  Report_Rec(rank, e.sender, e.msg, clock++);
+	//}
       }
-      else if(e.type == 2) {//END
+      //End Instruction Recieved -> Error
+      else if(e.type == 2) {
         fprintf(stdout, "How did we get here?\n");
         break;
       }
     }
+    //Send the Finish Clock Time to Manager
     MPI_Send(&clock, 1, MPI_INT, 0, 70, MPI_COMM_WORLD);
   }
   
@@ -179,8 +201,8 @@ struct Event Read_Event() {
   
   if( !strcmp(etype, "exec") ) {//if type == exec
     e.type = 0;
-    /* Sender is an imporper name here. It is simply the process
-     * which will be simulation an instruction execution.
+    /* "Sender" in this case really means the process that
+     *  will be simulating an instruction execution.
      */
     scanf("%d", &e.sender);
     return e;
