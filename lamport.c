@@ -4,7 +4,6 @@
 #include <string.h>
 
 /* TAGS, all of which are totally arbitrary because I came up with them on the spot
- * 40 => Single integer specifying length of char message to follow. If -1, end
  * 55 => Character message of length specified by preceding message.
  * 70 => Single integer specifying the ending clock of a process.
  */
@@ -25,7 +24,9 @@ struct Event {
 
 /** Function Definitions **/
 
-struct Event Deserialize_Event(char* serial, int len);
+struct Event Deserialize_Event(char* serial);
+
+int Digits(int i);
 
 void Serialize_Event(struct Event e, char* serial, int* len);
 
@@ -42,7 +43,7 @@ void Report_Send(int rank, int receiverank, char* msg, int clock);
 
 //TODO implement clocks in a meaningful way
 //  sub TODO implement passing of clock in serialization
-//TODO ask Scherger if there is a way to print in order
+//TODO Add barriers to prevent things from getting out of order
 int main(int argc, char* argv[]){
   /*Local Variables */
 
@@ -68,15 +69,15 @@ int main(int argc, char* argv[]){
       int slen;
       Serialize_Event(e, serial, &slen);
       //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
-      MPI_Send(&slen, 1, MPI_INT, e.sender, 40, MPI_COMM_WORLD);//send length
       MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
       e = Read_Event();
     }
+    //MPI_Barrier(MPI_COMM_WORLD);
     //SIMULATION ENDING
     //print out logical clock values
     for(int p = 1; p < size; p++) {
-      int end = -1;
-      MPI_Send(&end, 1, MPI_INT, p, 40, MPI_COMM_WORLD);
+      char end_serial[4] = "end\0";
+      MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
       int lclock;
       MPI_Recv(&lclock, 1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
       if(p == 1) {
@@ -90,17 +91,15 @@ int main(int argc, char* argv[]){
     int clock = 0;
     //While Simulation is Running
     while(1) {
-      int ilen;
-      MPI_Recv(&ilen, 1, MPI_INT, MPI_ANY_SOURCE, 40, MPI_COMM_WORLD, &status);
-      if(ilen == -1) { //end
-	//Quit the Simulation
+      //Recieving Message...
+      char input[262];
+      MPI_Recv(&input, 262, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
+      if( !strcmp(input, "end") ) { //end
+        //Quit the Simulation
         break;
       }
-      //Recieving Message...
-      char input[ilen];
-      MPI_Recv(&input, ilen, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
       //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
-      struct Event e = Deserialize_Event(input, ilen);
+      struct Event e = Deserialize_Event(input);
       //Exec Intruction Recieved
       if(e.type == 0) {
         Report_Exec(rank, ++clock);
@@ -109,7 +108,7 @@ int main(int argc, char* argv[]){
         if(rank == e.sender) {
           //if current process is the sender (received message from manager)
           Report_Send(rank, e.receiver, e.msg, ++clock);
-          MPI_Send(&ilen, 1, MPI_INT, e.receiver, 40, MPI_COMM_WORLD);//send length
+          int ilen = strlen(input);
           MPI_Send(&input, ilen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
         } else {
           //if current process is the receiver (received message from sender)
@@ -122,6 +121,7 @@ int main(int argc, char* argv[]){
       }
     }
     //Send the Finish Clock Time to Manager
+    //MPI_Barrier(MPI_COMM_WORLD);
     MPI_Send(&clock, 1, MPI_INT, 0, 70, MPI_COMM_WORLD);
   }
   
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]){
  * Takes a serialized event and its length, returns
  * the deserialized Event struct. 
  */
-struct Event Deserialize_Event(char* serial, int len) {
+struct Event Deserialize_Event(char* serial) {
   struct Event e;
   e.type = atoi(serial);
   if(e.type == 0) {//EXEC "t|s"
