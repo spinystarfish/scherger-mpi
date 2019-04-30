@@ -56,7 +56,7 @@ int main(int argc, char* argv[]){
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 
-  if(rank == 0) {//Manager Process
+  if(rank == 0) { //Manager Process
     int sim_size;
     scanf("%d", &sim_size);
     fprintf(stdout, "[0]: There are %d processes in the system\n", size);
@@ -72,7 +72,8 @@ int main(int argc, char* argv[]){
       MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
       e = Read_Event();
     }
-
+    //SIMULATION ENDING
+    //print out logical clock values
     for(int p = 1; p < size; p++) {
       int end = -1;
       MPI_Send(&end, 1, MPI_INT, p, 40, MPI_COMM_WORLD);
@@ -87,17 +88,21 @@ int main(int argc, char* argv[]){
     
   } else {//Simulation Processes
     int clock = 0;
-    while(1) {//Receive message, print repeat
+    //While Simulation is Running
+    while(1) {
       int ilen;
       MPI_Recv(&ilen, 1, MPI_INT, MPI_ANY_SOURCE, 40, MPI_COMM_WORLD, &status);
-      if(ilen == -1) {//end
+      if(ilen == -1) { //end
+	//Quit the Simulation
         break;
       }
+      //Recieving Message...
       char input[ilen];
       MPI_Recv(&input, ilen, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
       //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
       struct Event e = Deserialize_Event(input, ilen);
-      if(e.type == 0) {//EXEC
+      //Exec Intruction Recieved
+      if(e.type == 0) {
         Report_Exec(rank, ++clock);
       }
       else if(e.type == 1) {//SEND
@@ -116,6 +121,7 @@ int main(int argc, char* argv[]){
         break;
       }
     }
+    //Send the Finish Clock Time to Manager
     MPI_Send(&clock, 1, MPI_INT, 0, 70, MPI_COMM_WORLD);
   }
   
@@ -180,8 +186,8 @@ struct Event Read_Event() {
   
   if( !strcmp(etype, "exec") ) {//if type == exec
     e.type = 0;
-    /* Sender is an imporper name here. It is simply the process
-     * which will be simulation an instruction execution.
+    /* "Sender" in this case really means the process that
+     *  will be simulating an instruction execution.
      */
     scanf("%d", &e.sender);
     return e;
