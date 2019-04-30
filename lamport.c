@@ -40,8 +40,9 @@ void Report_Rec(int rank, int sendrank, char* msg, int clock);
 void Report_Send(int rank, int receiverank, char* msg, int clock);
 
 
-/***********************/
-
+//TODO implement clocks in a meaningful way
+//  sub TODO implement passing of clock in serialization
+//TODO ask Scherger if there is a way to print in order
 int main(int argc, char* argv[]){
   /*Local Variables */
 
@@ -69,15 +70,6 @@ int main(int argc, char* argv[]){
       //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
       MPI_Send(&slen, 1, MPI_INT, e.sender, 40, MPI_COMM_WORLD);//send length
       MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
-      /*
-      if(e.type == 0) {
-        //fprintf(stdout, "\tExec: %d\n", e.sender);
-        MPI_Send(&e.type, 1, MPI_INT, e.sender, 55, MPI_COMM_WORLD);
-      }
-      else if(e.type == 1) {
-        fprintf(stdout, "\tNOT Send: %d %d %s\n", e.sender, e.receiver, e.msg);
-      }
-      */
       e = Read_Event();
     }
 
@@ -92,7 +84,8 @@ int main(int argc, char* argv[]){
       Report_End(p, lclock);
     }
     
-  } else {
+    
+  } else {//Simulation Processes
     int clock = 0;
     while(1) {//Receive message, print repeat
       int ilen;
@@ -108,10 +101,18 @@ int main(int argc, char* argv[]){
         Report_Exec(rank, ++clock);
       }
       else if(e.type == 1) {//SEND
-        //TODO send message to another process
+        if(rank == e.sender) {
+          //if current process is the sender (received message from manager)
+          Report_Send(rank, e.receiver, e.msg, ++clock);
+          MPI_Send(&ilen, 1, MPI_INT, e.receiver, 40, MPI_COMM_WORLD);//send length
+          MPI_Send(&input, ilen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
+        } else {
+          //if current process is the receiver (received message from sender)
+          Report_Rec(rank, e.sender, e.msg, ++clock);
+        }
       }
       else if(e.type == 2) {//END
-        fprintf(stdout, "How did we get here?\n");
+        fprintf(stderr, "END message found in wrong location.\n");
         break;
       }
     }
@@ -150,12 +151,12 @@ struct Event Deserialize_Event(char* serial, int len) {
  */
 void Serialize_Event(struct Event e, char* serial, int* len) {
   sprintf(serial, "%d|", e.type);
-  if(e.type == 0) {//EXEC "t|s"
+  if(e.type == 0) {//EXEC "type|sender"
     sprintf(serial+2, "%d\0", e.sender);
     *len = 4;
     return;
   }
-  else if(e.type == 1) {//SEND "t|s|r|m"
+  else if(e.type == 1) {//SEND "type|sender|receiver|message"
     sprintf(serial+2, "%d|", e.sender);
     sprintf(serial+4, "%d|", e.receiver);
     sprintf(serial+6, "%s\0", e.msg);
