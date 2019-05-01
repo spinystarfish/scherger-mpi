@@ -4,3 +4,8 @@ exec 2
 send 1 3 "silly message"
 send 2 1 "hello world"
 end
+
+Ending Clocks:
+1: 3
+2: 2
+3: 3
