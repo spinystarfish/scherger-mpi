@@ -2,9 +2,11 @@
 #include <mpi.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* TAGS, all of which are totally arbitrary because I came up with them on the spot
  * 55 => Character message of length specified by preceding message.
+ * 60 => Messages between simulation processes
  * 70 => Single integer specifying the ending clock of a process.
  */
 
@@ -81,6 +83,7 @@ int main(int argc, char* argv[]){
     
     //SIMULATION ENDING
     //print out logical clock values
+    sleep(1);
     for(int p = 1; p < size; p++) {
       char end_serial[4] = "end\0";
       MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
@@ -124,12 +127,13 @@ int main(int argc, char* argv[]){
           Serialize_Event(e, serial, &slen);
           
           //pass message:
-          MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
-        } else {
+          MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
+        } 
+        else {
           //if current process is the receiver (received message from sender)
           
           //Wait for message from actual sender:
-          MPI_Recv(&input, 300, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD, &status);
+          MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
           e = Deserialize_Event(input);
           
           //determine new clock value:
