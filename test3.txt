@@ -1,0 +1,14 @@
+5
+exec 1
+exec 4
+send 3 1 "hi"
+exec 5
+send 2 4 "how are you"
+exec 2
+send 4 3 "Just testing!"
+send 1 5 "dOn'T mInD Me!!!"
+exec 3
+exec 5
+exec 1
+send 5 4 "? "
+end
