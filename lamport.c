@@ -44,9 +44,8 @@ void Report_Rec(int rank, int sendrank, char* msg, int clock);
 void Report_Send(int rank, int receiverank, char* msg, int clock);
 
 
-//TODO implement clocks in a meaningful way
-//  sub TODO implement passing of clock in serialization
-//TODO Add barriers to prevent things from getting out of order
+//TODO Barriers have been added to prevent things from getting out of order, but prints still not working
+//      Scherger has been emailed. I don't know if any more working can be done currently. 
 int main(int argc, char* argv[]){
   /*Local Variables */
 
