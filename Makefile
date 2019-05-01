@@ -1,9 +1,9 @@
 ###########################################################
 #
-# Simple Makefile for Operating Systems Project 1
-# tcush
+# Simple Makefile for Operating Systems Project 5
+# Logical and Vector Clocks using MPI
 #
-# (C++ Version)
+# (C Version)
 #
 #
 ###########################################################
@@ -31,4 +31,7 @@ test1:
 
 test2:
 	$(RUN) $(RUNFLAGS) 4 $(EXE) < test2.txt
+
+test3:
+	$(RUN) $(RUNFLAGS) 6 $(EXE) < test3.txt
 
