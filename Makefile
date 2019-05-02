@@ -17,10 +17,9 @@ LIBS =
 RM = /bin/rm
 RMFLAGS = -f
 
-EXE = lamport
-OBJ = lamport.c
+all: lamport vector
 
-$(EXE): $(OBJ)
+lamport: lamport.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 vector: vector.c
@@ -29,14 +28,20 @@ vector: vector.c
 clean:
 	$(RM) $(RMFLAGS) *.o *~ $(EXE)
 
-test1:
-	$(RUN) $(RUNFLAGS) 4 $(EXE) < test1.txt
+t1:
+	$(RUN) $(RUNFLAGS) 4 lamport < test1.txt
 
-test2:
-	$(RUN) $(RUNFLAGS) 4 $(EXE) < test2.txt
+t2:
+	$(RUN) $(RUNFLAGS) 4 lamport < test2.txt
 
-test3:
-	$(RUN) $(RUNFLAGS) 6 $(EXE) < test3.txt
+t3:
+	$(RUN) $(RUNFLAGS) 6 lamport < test3.txt
 
-vectort1:
+v1:
 	$(RUN) $(RUNFLAGS) 4 vector < test1.txt
+
+v2:
+	$(RUN) $(RUNFLAGS) 4 vector < test2.txt
+
+v3:
+	$(RUN) $(RUNFLAGS) 6 vector < test3.txt
