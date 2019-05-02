@@ -30,6 +30,8 @@ struct Event Deserialize_Event(char* serial);
 
 int Digits(int i);
 
+void Manager(int size);
+
 int Max(int a, int b);
 
 void Print_Clocks(int* clocks, int len, int rank, char* name);
@@ -46,6 +48,8 @@ void Report_Send(int rank, int receiverank, char* msg, int clock);
 
 void Serialize_Event(struct Event e, char* serial, int* len);
 
+void Sim_Process(int size, int rank);
+
 void Update_Clocks(int* tmpclocks, int* clocks, int len);
 
 
@@ -54,7 +58,6 @@ int main(int argc, char* argv[]){
 
   int rank;
   int size;
-  MPI_Status status;
 
   MPI_Init(&argc, &argv);
 
@@ -63,108 +66,9 @@ int main(int argc, char* argv[]){
 
 
   if(rank == 0) { //Manager Process
-    int sim_size;
-    scanf("%d", &sim_size);
-    fprintf(stdout, "[0]: There are %d processes in the system\n", sim_size);
-
-    //Reads in events and sends events to appropriate processes
-    struct Event e = Read_Event();
-    while(e.type == 0 || e.type == 1) {
-      char serial[300];
-      int slen;
-      Serialize_Event(e, serial, &slen);
-      //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
-      if(e.type == 1) {
-        //if send event, send a warning to receiver to prepare
-        MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
-      }
-      MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
-      e = Read_Event();
-    }
-    
-    //SIMULATION ENDING
-    //print out logical clock values
-    sleep(1);
-    for(int p = 1; p < size; p++) {
-      char end_serial[4] = "end\0";
-      MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    /* TODO: Print out vectors, not individual clock values
-    int end_clocks[size];
-    fprintf(stdout, "[0]: Simulation ending\n");
-    for(int p = 1; p < size; p++) {
-      int lclock;
-      MPI_Recv(&lclock, 1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
-      Report_End(p, lclock);
-    
-    }
-    */
-    
+    Manager(size);
   } else { //Simulation Processes
-    int* clocks = malloc((size-1) * sizeof(int));
-    for(int i = 0; i < size-1; i++) {
-      clocks[i] = 0;
-    }
-    //While Simulation is Running
-    while(1) {
-      //Recieving Message...
-      char input[300];
-      MPI_Recv(&input, 300, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
-      if( !strcmp(input, "end") ) { //end
-        //Quit the Simulation
-        break;
-      }
-      //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
-      struct Event e = Deserialize_Event(input);
-      
-      if(e.type == 0) {
-        //Exec Intruction Recieved
-        Report_Exec(rank, ++clocks[rank-1]);
-      }
-      else if(e.type == 1) {//SEND
-        if(rank == e.sender) {
-          //if current process is the sender (received message from manager)
-          Report_Send(rank, e.receiver, e.msg, ++clocks[rank-1]);
-          
-          //add clock to event and reserialize:
-          char serial[300];
-          int slen;
-          Serialize_Event(e, serial, &slen);
-
-          //pass your clocks
-          MPI_Send(&clocks, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
-          //pass message:
-          MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
-        } 
-        else {
-          //if current process is the receiver (received message from sender)
-	  
-          int* tmpclocks;// = malloc((size-1) * sizeof(int));
-          MPI_Recv(&tmpclocks, size-1, MPI_INT, e.sender, 30, MPI_COMM_WORLD, &status);
-          clocks[rank-1]++;
-          //TODO: narrowed the problem down to tmpclocks not existing and always given a seg fault
-          Print_Clocks(clocks, size-1, rank, "clocks");
-          Print_Clocks(tmpclocks, size-1, rank, "tmpclocks");
-          Update_Clocks(tmpclocks, clocks, size-1);
-          fprintf(stdout, "%d has gotten here\n", rank);
-          //TODO: Free tmpclocks
-	  
-          //Wait for message from actual sender:
-          MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
-          e = Deserialize_Event(input);
-          
-          Report_Rec(rank, e.sender, e.msg, ++clocks[rank-1]);
-        }
-      }
-      else if(e.type == 2) {//END
-        fprintf(stderr, "END message found in wrong location.\n");
-        break;
-      }
-    }
-    //Send the Finish Clock Time to Manager
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Send(&clocks, size-1, MPI_INT, 0, 30, MPI_COMM_WORLD);
+    Sim_Process(size, rank);
   }
   
   MPI_Finalize();
@@ -203,6 +107,51 @@ int Digits(int i) {
   char temp[10];
   sprintf(temp, "%d", i);
   return strlen(temp);
+}
+
+/*
+ * Manager
+ * Carries out the tasks of the Manager Process
+ */
+void Manager(int size) {
+  int sim_size;
+  scanf("%d", &sim_size);
+  fprintf(stdout, "[0]: There are %d processes in the system\n", sim_size);
+
+  //Reads in events and sends events to appropriate processes
+  struct Event e = Read_Event();
+  while(e.type == 0 || e.type == 1) {
+    char serial[300];
+    int slen;
+    Serialize_Event(e, serial, &slen);
+    //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
+    if(e.type == 1) {
+      //if send event, send a warning to receiver to prepare
+      MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
+    }
+    MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
+    e = Read_Event();
+  }
+  
+  //SIMULATION ENDING
+  //print out logical clock values
+  sleep(1);
+  for(int p = 1; p < size; p++) {
+    char end_serial[4] = "end\0";
+    MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  /* TODO: Print out vectors, not individual clock values
+  int end_clocks[size];
+  fprintf(stdout, "[0]: Simulation ending\n");
+  for(int p = 1; p < size; p++) {
+    int lclock;
+    MPI_Status status;
+    MPI_Recv(&lclock, 1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
+    Report_End(p, lclock);
+  
+  }
+  */
 }
 
 /*
@@ -335,6 +284,77 @@ void Serialize_Event(struct Event e, char* serial, int* len) {
     index += strlen(e.msg) + 1;
   }
   *len = index;
+}
+
+/*
+ * Sim_Process
+ * Carries out the tasks of a simulation process.
+ */
+void Sim_Process(int size, int rank) {
+  MPI_Status status;
+  int* clocks = malloc((size-1) * sizeof(int));
+  for(int i = 0; i < size-1; i++) {
+    clocks[i] = 0;
+  }
+  //While Simulation is Running
+  while(1) {
+    //Recieving Message...
+    char input[300];
+    MPI_Recv(&input, 300, MPI_CHAR, MPI_ANY_SOURCE, 55, MPI_COMM_WORLD, &status);
+    if( !strcmp(input, "end") ) { //end
+      //Quit the Simulation
+      break;
+    }
+    //fprintf(stdout, "%d To Deserial %d: %s\n", rank, ilen, input);
+    struct Event e = Deserialize_Event(input);
+    
+    if(e.type == 0) {
+      //Exec Intruction Recieved
+      Report_Exec(rank, ++clocks[rank-1]);
+    }
+    else if(e.type == 1) {//SEND
+      if(rank == e.sender) {
+        //if current process is the sender (received message from manager)
+        Report_Send(rank, e.receiver, e.msg, ++clocks[rank-1]);
+        
+        //add clock to event and reserialize:
+        char serial[300];
+        int slen;
+        Serialize_Event(e, serial, &slen);
+
+        //pass your clocks
+        MPI_Send(&clocks, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
+        //pass message:
+        MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
+      } 
+      else {
+        //if current process is the receiver (received message from sender)
+  
+        int* tmpclocks;// = malloc((size-1) * sizeof(int));
+        MPI_Recv(&tmpclocks, size-1, MPI_INT, e.sender, 30, MPI_COMM_WORLD, &status);
+        clocks[rank-1]++;
+        //TODO: narrowed the problem down to tmpclocks not existing and always given a seg fault
+        Print_Clocks(clocks, size-1, rank, "clocks");
+        Print_Clocks(tmpclocks, size-1, rank, "tmpclocks");
+        Update_Clocks(tmpclocks, clocks, size-1);
+        fprintf(stdout, "%d has gotten here\n", rank);
+        //TODO: Free tmpclocks
+  
+        //Wait for message from actual sender:
+        MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
+        e = Deserialize_Event(input);
+        
+        Report_Rec(rank, e.sender, e.msg, ++clocks[rank-1]);
+      }
+    }
+    else if(e.type == 2) {//END
+      fprintf(stderr, "END message found in wrong location.\n");
+      break;
+    }
+  }
+  //Send the Finish Clock Time to Manager
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Send(&clocks, size-1, MPI_INT, 0, 30, MPI_COMM_WORLD);
 }
 
 /*
