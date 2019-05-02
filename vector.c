@@ -33,8 +33,6 @@ int Digits(int i);
 
 int Max(int a, int b);
 
-int* Update_Clocks(int* tmpclocks, int* clocks);
-
 void Serialize_Event(struct Event e, char* serial, int* len);
 
 struct Event Read_Event();
@@ -46,6 +44,8 @@ void Report_Exec(int rank, int clock);
 void Report_Rec(int rank, int sendrank, char* msg, int clock);
 
 void Report_Send(int rank, int receiverank, char* msg, int clock);
+
+void Update_Clocks(int* tmpclocks, int* clocks, int len);
 
 
 int main(int argc, char* argv[]){
@@ -214,20 +214,6 @@ int Max(int a, int b) {
 }
 
 /*
- * Update_Clocks
- * Given an array of integer clock values (tmpclocks),
- * find the max integer at each array location and place
- * it in the clocks array
- */
-int* Update_Clocks(int *tmpclocks, int *clocks){
-  int* newclocks = malloc(sizeof(clocks));
-  for(int i=0; i < (sizeof(clocks)/sizeof(int)); i++)
-    newclocks[i] = Max(tmpclocks[i], clocks[i]);
-
-  return newclocks;
-}   
-
-/*
  * Serialize_Event
  * Given an Event struct, serialize it into a char*
  * (serial) with discovered length (len). Serial
@@ -337,4 +323,15 @@ void Report_Rec(int rank, int sendrank, char* msg, int clock) {
  */
 void Report_Send(int rank, int receiverank, char* msg, int clock) {
   fprintf(stdout, "\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
+}
+
+/*
+ * Update_Clocks
+ * Given an array of integer clock values (tmpclocks),
+ * find the max integer at each array location and place
+ * it in the clocks array
+ */
+void Update_Clocks(int *tmpclocks, int *clocks, int len){
+  for(int i = 0; i < len; i++)
+    clocks[i] = Max(tmpclocks[i], clocks[i]);
 }
