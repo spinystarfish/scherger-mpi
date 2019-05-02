@@ -5,9 +5,9 @@
 #include <unistd.h>
 
 /* TAGS, all of which are totally arbitrary because I came up with them on the spot
+ * 30 => Array of clocks integers
  * 55 => Character message of length specified by preceding message.
  * 60 => Messages between simulation processes
- * 30 => Array of clocks integers
  */
 
 /** Global Variables **/
@@ -22,7 +22,6 @@ struct Event {
   int sender;
   int receiver;
   char msg[256];
-  int clock;
 };
 
 /** Function Definitions **/
@@ -33,7 +32,7 @@ int Digits(int i);
 
 int Max(int a, int b);
 
-void Serialize_Event(struct Event e, char* serial, int* len);
+void Print_Clocks(int* clocks, int len, int rank, char* name);
 
 struct Event Read_Event();
 
@@ -44,6 +43,8 @@ void Report_Exec(int rank, int clock);
 void Report_Rec(int rank, int sendrank, char* msg, int clock);
 
 void Report_Send(int rank, int receiverank, char* msg, int clock);
+
+void Serialize_Event(struct Event e, char* serial, int* len);
 
 void Update_Clocks(int* tmpclocks, int* clocks, int len);
 
@@ -102,6 +103,9 @@ int main(int argc, char* argv[]){
     
   } else { //Simulation Processes
     int* clocks = malloc((size-1) * sizeof(int));
+    for(int i = 0; i < size-1; i++) {
+      clocks[i] = 0;
+    }
     //While Simulation is Running
     while(1) {
       //Recieving Message...
@@ -116,37 +120,41 @@ int main(int argc, char* argv[]){
       
       if(e.type == 0) {
         //Exec Intruction Recieved
-        Report_Exec(rank, ++clocks[rank]);
+        Report_Exec(rank, ++clocks[rank-1]);
       }
       else if(e.type == 1) {//SEND
         if(rank == e.sender) {
           //if current process is the sender (received message from manager)
-          Report_Send(rank, e.receiver, e.msg, ++clocks[rank]);
+          Report_Send(rank, e.receiver, e.msg, ++clocks[rank-1]);
           
           //add clock to event and reserialize:
-          e.clock = clocks[rank];
           char serial[300];
           int slen;
           Serialize_Event(e, serial, &slen);
 
-	  //pass your clocks
-	  MPI_Send(&clocks, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
-	  //pass message:
+          //pass your clocks
+          MPI_Send(&temp, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
+          //pass message:
           MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
         } 
         else {
           //if current process is the receiver (received message from sender)
 	  
-	  int* tmpclocks = malloc((size-1) * sizeof(int));
-	  MPI_Recv(&tmpclocks, size-1, MPI_INT, e.sender, 30, MPI_COMM_WORLD, &status);
-	  clocks = Update_Clocks(tmpclocks, clocks);
-	  //TODO: Free tmpclocks
+          int* tmpclocks;// = malloc((size-1) * sizeof(int));
+          MPI_Recv(&tmpclocks, size-1, MPI_INT, e.sender, 30, MPI_COMM_WORLD, &status);
+          clocks[rank-1]++;
+          //TODO: narrowed the problem down to tmpclocks not existing and always given a seg fault
+          Print_Clocks(clocks, size-1, rank, "clocks");
+          Print_Clocks(tmpclocks, size-1, rank, "tmpclocks");
+          Update_Clocks(tmpclocks, clocks, size-1);
+          fprintf(stdout, "%d has gotten here\n", rank);
+          //TODO: Free tmpclocks
 	  
           //Wait for message from actual sender:
           MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
           e = Deserialize_Event(input);
           
-          Report_Rec(rank, e.sender, e.msg, ++clocks[rank]);
+          Report_Rec(rank, e.sender, e.msg, ++clocks[rank-1]);
         }
       }
       else if(e.type == 2) {//END
@@ -175,16 +183,11 @@ struct Event Deserialize_Event(char* serial) {
     e.sender = atoi(serial+index);
     e.receiver = -1;
   }
-  else if(e.type == 1) {//SEND "type|sender|receiver|[clock]|message"
+  else if(e.type == 1) {//SEND "type|sender|receiver|message"
     e.sender = atoi(serial+index);
     index += Digits(e.sender) + 1;
     e.receiver = atoi(serial+index);
     index += Digits(e.receiver) + 1;
-    if( strchr(serial+index, '|') ) {
-      //if there is another '|', then clock is the next element
-      e.clock = atoi(serial+index);
-      index += Digits(e.clock) + 1;
-    }
     sprintf(e.msg, "%s\0", serial+index);
   }
   
@@ -214,32 +217,17 @@ int Max(int a, int b) {
 }
 
 /*
- * Serialize_Event
- * Given an Event struct, serialize it into a char*
- * (serial) with discovered length (len). Serial
- * must have memory allocated already [300].
+ * Print_Clocks
+ * Simply a statement used for debugging.
+ * Should not be used in the final version 
+ * and can be deleted.
  */
-void Serialize_Event(struct Event e, char* serial, int* len) {
-  sprintf(serial, "%d|", e.type);
-  int index = 2;
-  if(e.type == 0) {//EXEC "type|sender"
-    sprintf(serial+index, "%d\0", e.sender);
-    index += Digits(e.sender) + 1;
-  }
-  else if(e.type == 1) {//SEND "type|sender|receiver|[clock]|message"
-    sprintf(serial+index, "%d|", e.sender);
-    index += Digits(e.sender) + 1;
-    sprintf(serial+index, "%d|", e.receiver);
-    index += Digits(e.receiver) + 1;
-    if(e.clock != 0) {
-      //clock exists, because current process is sender
-      sprintf(serial+index, "%d|", e.clock);
-      index += Digits(e.clock) + 1;
-    }
-    sprintf(serial+index, "%s\0", e.msg);
-    index += strlen(e.msg) + 1;
-  }
-  *len = index;
+void Print_Clocks(int* clocks, int len, int rank, char* name) {
+  fprintf(stdout, "%d %s: ", rank, name);
+  fflush(stdout);
+  for(int i = 0; i < len; i++ )
+    fprintf(stdout, "%d ", clocks[i]);
+  fprintf(stdout, "\n");
 }
 
 /*
@@ -323,6 +311,30 @@ void Report_Rec(int rank, int sendrank, char* msg, int clock) {
  */
 void Report_Send(int rank, int receiverank, char* msg, int clock) {
   fprintf(stdout, "\t[%d]: Message Send to %d: Message >%s<: Logical Clock = %d\n", rank, receiverank, msg, clock);
+}
+
+/*
+ * Serialize_Event
+ * Given an Event struct, serialize it into a char*
+ * (serial) with discovered length (len). Serial
+ * must have memory allocated already [300].
+ */
+void Serialize_Event(struct Event e, char* serial, int* len) {
+  sprintf(serial, "%d|", e.type);
+  int index = 2;
+  if(e.type == 0) {//EXEC "type|sender"
+    sprintf(serial+index, "%d\0", e.sender);
+    index += Digits(e.sender) + 1;
+  }
+  else if(e.type == 1) {//SEND "type|sender|receiver|message"
+    sprintf(serial+index, "%d|", e.sender);
+    index += Digits(e.sender) + 1;
+    sprintf(serial+index, "%d|", e.receiver);
+    index += Digits(e.receiver) + 1;
+    sprintf(serial+index, "%s\0", e.msg);
+    index += strlen(e.msg) + 1;
+  }
+  *len = index;
 }
 
 /*
