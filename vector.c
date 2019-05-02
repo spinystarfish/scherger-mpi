@@ -34,6 +34,10 @@ void Manager();
 
 int Max(int a, int b);
 
+int* Create_Clocks(int size);
+
+int* Update_Clocks(int* tmpclocks, int* clocks, int size);
+
 struct Event Read_Event();
 
 void Report_End(int rank, int* clocks, int size);
@@ -137,15 +141,14 @@ void Manager() {
     MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  int* end_clocks[sim_size]; //TODO: Make this an array of arrays
   fprintf(stdout, "[0]: Simulation ending\n");
-  /*for(int p = 1; p < sim_size; p++) {
-    int* lclocks = malloc(sim_size * sizeof(int));
+  for(int p = 1; p < sim_size+1; p++) {
+    int* lclocks = Create_Clocks(sim_size+1);
     MPI_Status status;
-    MPI_Recv(lclock, sim_size, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
-    Report_End(p, lclock, size);
+    MPI_Recv(lclocks, sim_size+1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
+    Report_End(p, lclocks, sim_size+1);
   }
-  */
+  
 }
 
 /*
@@ -159,6 +162,28 @@ int Max(int a, int b) {
     return b;
 }
 
+/* Create_Clocks
+ * Allocates storage and initializes a pointer to
+ * an array of integers
+ */
+int* Create_Clocks(int size){
+  int* clocks = malloc(size * sizeof(int));
+  for(int i=0; i < size; i++){
+    clocks[i] = 0;
+  }
+  return clocks;
+}
+
+/* Update_Clocks
+ * Updates the clocks values with any values in 
+ * tmpclocks that are larger
+ */
+int* Update_Clocks(int* tmpclocks, int* clocks, int size){
+  for(int i=0; i < size; i++){
+    clocks[i] = Max(tmpclocks[i], clocks[i]);
+  }
+  return clocks;
+}
 /*
  * Read_Event
  * Takes the next line of stdin and saves the details in
@@ -213,7 +238,7 @@ struct Event Read_Event() {
  */
 void Report_End(int rank, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Logical Clock = [", rank);
-  for(int i = 0; i < size; i++){
+  for(int i = 1; i < size; i++){
     if(i != (size-1))
       fprintf(stdout, "%d,", clocks[i]);
     else
@@ -229,7 +254,7 @@ void Report_End(int rank, int* clocks, int size) {
  */
 void Report_Exec(int rank, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Execution Event: Logical Clock = [", rank);
-  for(int i = 0; i < size; i++){
+  for(int i = 1; i < size; i++){
    if(i != (size-1))
       fprintf(stdout, "%d,", clocks[i]);
    else
@@ -245,7 +270,7 @@ void Report_Exec(int rank, int* clocks, int size) {
  */
 void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Message Received from %d: Message >%s<: Logical Clock = [", rank, sendrank, msg);
-  for(int i = 0; i < size; i++){
+  for(int i = 1; i < size; i++){
    if(i != (size-1))
       fprintf(stdout, "%d,", clocks[i]);
    else
@@ -261,7 +286,7 @@ void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size) {
  */
 void Report_Send(int rank, int receiverank, char* msg, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Message Send to %d: Message >%s<: Logical Clock = [", rank, receiverank, msg);
-  for(int i = 0; i < size; i++){
+  for(int i = 1; i < size; i++){
    if(i != (size-1))
       fprintf(stdout, "%d,", clocks[i]);
    else
@@ -300,11 +325,7 @@ void Serialize_Event(struct Event e, char* serial, int* len) {
  */
 void Sim_Process(int rank, int size) {
   MPI_Status status;
-  int* clocks = malloc(size * sizeof(int));
-  for(int i=0; i < size; i++){
-    clocks[i] = 0;
-  }
-  fprintf(stdout, "%d", sizeof(clocks));
+  int* clocks = Create_Clocks(size);
   //While Simulation is Running
   while(1) {
     //Recieving Message...
@@ -319,33 +340,36 @@ void Sim_Process(int rank, int size) {
     
     if(e.type == 0) {
       //Exec Intruction Recieved
-      //TODO: Increment clock value
+      clocks[rank-1]++;
       Report_Exec(rank-1, clocks, size);
     }
     else if(e.type == 1) {//SEND
       if(rank == e.sender) {
         //if current process is the sender (received message from manager)
 	//TODO: Increment clock value
+	clocks[rank-1]++;
         Report_Send(rank-1, e.receiver, e.msg, clocks, size);
-        
+
         char serial[300];
         int slen;
         Serialize_Event(e, serial, &slen);
 	
 
 	//TODO: pass the clock array
+	MPI_Send(clocks, size, MPI_INT, e.receiver, 70, MPI_COMM_WORLD);
         //pass message:
         MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
       } 
       else {
         //if current process is the receiver (received message from sender)
-        
+        int* tmpclocks = Create_Clocks(size);
         //Wait for message from actual sender:
+	MPI_Recv(tmpclocks, size, MPI_INT, e.sender, 70, MPI_COMM_WORLD, &status);
+	clocks = Update_Clocks(tmpclocks, clocks, size);
+	
         MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
         e = Deserialize_Event(input);
         
-        //determine new clock value:
-	//TODO
         Report_Rec(rank-1, e.sender, e.msg, clocks, size);
       }
     }
