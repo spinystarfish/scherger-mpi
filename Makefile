@@ -18,9 +18,12 @@ RM = /bin/rm
 RMFLAGS = -f
 
 EXE = lamport
-OBJS = lamport.c
+OBJ = lamport.c
 
-$(EXE): $(OBJS)
+$(EXE): $(OBJ)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
+
+vector: vector.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 clean:
@@ -35,3 +38,5 @@ test2:
 test3:
 	$(RUN) $(RUNFLAGS) 6 $(EXE) < test3.txt
 
+vectort1:
+	$(RUN) $(RUNFLAGS) 4 vector < test1.txt
