@@ -26,6 +26,7 @@ int main(int argc, char *argv[]){
   }
   else if(rank == 1){
     MPI_Recv(data, 5, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+    MPI_Barrier(MPI_COMM_WORLD);
     for(i=0; i<5; i++)
       printf("%d ",data[i]);
     printf("\n");    
