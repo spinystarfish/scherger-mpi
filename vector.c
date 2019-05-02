@@ -64,7 +64,7 @@ int main(int argc, char* argv[]){
   if(rank == 0) { //Manager Process
     int sim_size;
     scanf("%d", &sim_size);
-    fprintf(stdout, "[0]: There are %d processes in the system\n", size);
+    fprintf(stdout, "[0]: There are %d processes in the system\n", sim_size);
 
     //Reads in events and sends events to appropriate processes
     struct Event e = Read_Event();
