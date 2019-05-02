@@ -25,37 +25,30 @@ struct Event {
 };
 
 /** Function Definitions **/
-
-struct Event Deserialize_Event(char* serial);
-
-int Digits(int i);
-
-void Manager();
-
+void Print_Clocks(int size, int* clocks);
 int Max(int a, int b);
-
+int Digits(int i);
 int* Create_Clocks(int size);
-
 int* Update_Clocks(int* tmpclocks, int* clocks, int size);
-
-struct Event Read_Event();
-
-void Report_End(int rank, int* clocks, int size);
-
-void Report_Exec(int rank, int* clocks, int size);
-
-void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size);
-
-void Report_Send(int rank, int receiverank, char* msg, int* clocks, int size);
-
 void Serialize_Event(struct Event e, char* serial, int* len);
-
+struct Event Deserialize_Event(char* serial);
+struct Event Read_Event();
+void Report_End(int rank, int* clocks, int size);
+void Report_Exec(int rank, int* clocks, int size);
+void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size);
+void Report_Send(int rank, int receiverank, char* msg, int* clocks, int size);
+void Manager();
 void Sim_Process(int rank, int size);
 
-
+/* Main Method
+ * 
+ * boots up the program, calls 
+ * methods based on process rank
+ * for further execution, and 
+ * cleans up with MPI_Finalize()
+ */
 int main(int argc, char* argv[]){
   /*Local Variables */
-
   int rank;
   int size;
 
@@ -74,81 +67,20 @@ int main(int argc, char* argv[]){
   MPI_Finalize();
 }
 
-/*
- * Deserialize_Event
- * Takes a serialized event and its length, returns
- * the deserialized Event struct. 
+/* 
+ * Print_Clocks
+ *
+ * helper function that prints
+ * all the variables in the clock
+ * array (brackets not included
  */
-struct Event Deserialize_Event(char* serial) {
-  struct Event e;
-  e.type = atoi(serial);
-  int index = Digits(e.type) + 1;
-  if(e.type == 0) {//EXEC "type|sender"
-    e.sender = atoi(serial+index);
-    e.receiver = -1;
+void Print_Clocks(int size, int* clocks){
+  for(int i = 1; i < size; i++){
+   if(i != (size-1))
+      fprintf(stdout, "%d,", clocks[i]);
+   else
+     fprintf(stdout, "%d", clocks[i]);
   }
-  else if(e.type == 1) {//SEND "type|sender|receiver|message"
-    e.sender = atoi(serial+index);
-    index += Digits(e.sender) + 1;
-    e.receiver = atoi(serial+index);
-    index += Digits(e.receiver) + 1;
-    sprintf(e.msg, "%s\0", serial+index);
-  }
-  
-  return e;
-}
-
-/*
- * Digits
- * Returns the number of chars which the number would take up if 
- * converted to a char array.
- */
-int Digits(int i) {
-  char temp[10];
-  sprintf(temp, "%d", i);
-  return strlen(temp);
-}
-
-/*
- * Manager
- * Carries out the tasks of the Manager Process
- */
-void Manager() {
-  int sim_size;
-  scanf("%d", &sim_size);
-  fprintf(stdout, "[0]: There are %d processes in the system\n", sim_size);
-
-  //Reads in events and sends events to appropriate processes
-  struct Event e = Read_Event();
-  while(e.type == 0 || e.type == 1) {
-    char serial[300];
-    int slen;
-    Serialize_Event(e, serial, &slen);
-    //fprintf(stdout, "Sending Out %d: %s\n", slen, serial);
-    if(e.type == 1) {
-      //if send event, send a warning to receiver to prepare
-      MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);//send event
-    }
-    MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);//send event
-    e = Read_Event();
-  }
-  
-  //SIMULATION ENDING
-  //print out logical clock values
-  sleep(1);
-  for(int p = 1; p < sim_size; p++) {
-    char end_serial[4] = "end\0";
-    MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  fprintf(stdout, "[0]: Simulation ending\n");
-  for(int p = 1; p < sim_size+1; p++) {
-    int* lclocks = Create_Clocks(sim_size+1);
-    MPI_Status status;
-    MPI_Recv(lclocks, sim_size+1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
-    Report_End(p, lclocks, sim_size+1);
-  }
-  
 }
 
 /*
@@ -160,6 +92,18 @@ int Max(int a, int b) {
     return a;
   else
     return b;
+}
+
+/*
+ * Digits
+ * 
+ * @returns number of digits needed to
+ * represent the integer i.
+ */
+int Digits(int i) {
+  char temp[10];
+  sprintf(temp, "%d", i);
+  return strlen(temp);
 }
 
 /* Create_Clocks
@@ -184,6 +128,55 @@ int* Update_Clocks(int* tmpclocks, int* clocks, int size){
   }
   return clocks;
 }
+
+/*
+ * Serialize_Event
+ * Given an Event struct, serialize it into a char*
+ * (serial) with discovered length (len). Serial
+ * must have memory allocated already [300].
+ */
+void Serialize_Event(struct Event e, char* serial, int* len) {
+  sprintf(serial, "%d|", e.type);
+  int index = 2;
+  if(e.type == 0) {//EXEC "type|sender"
+    sprintf(serial+index, "%d\0", e.sender);
+    index += Digits(e.sender) + 1;
+  }
+  else if(e.type == 1) {//SEND "type|sender|receiver|message"
+    sprintf(serial+index, "%d|", e.sender);
+    index += Digits(e.sender) + 1;
+    sprintf(serial+index, "%d|", e.receiver);
+    index += Digits(e.receiver) + 1;
+    sprintf(serial+index, "%s\0", e.msg);
+    index += strlen(e.msg) + 1;
+  }
+  *len = index;
+}
+
+/*
+ * Deserialize_Event
+ * 
+ * parses a serialized string for information
+ * @returns an Event struct 
+ */
+struct Event Deserialize_Event(char* serial) {
+  struct Event e;
+  e.type = atoi(serial);
+  int index = Digits(e.type) + 1;
+  if(e.type == 0) {                    //EXEC "type|sender"
+    e.sender = atoi(serial+index);
+    e.receiver = -1;
+  }
+  else if(e.type == 1) {              //SEND "type|sender|receiver|message"
+    e.sender = atoi(serial+index);
+    index += Digits(e.sender) + 1;
+    e.receiver = atoi(serial+index);
+    index += Digits(e.receiver) + 1;
+    sprintf(e.msg, "%s\0", serial+index);
+  }
+  return e;
+}
+
 /*
  * Read_Event
  * Takes the next line of stdin and saves the details in
@@ -197,7 +190,6 @@ struct Event Read_Event() {
   
   char etype[10];
   scanf("%s", &etype); //read event type
-  
   if( !strcmp(etype, "exec") ) {//if type == exec
     e.type = 0;
     /* "Sender" in this case really means the process that
@@ -238,12 +230,7 @@ struct Event Read_Event() {
  */
 void Report_End(int rank, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Logical Clock = [", rank);
-  for(int i = 1; i < size; i++){
-    if(i != (size-1))
-      fprintf(stdout, "%d,", clocks[i]);
-    else
-      fprintf(stdout, "%d", clocks[i]);
-  }
+  Print_Clocks(size, clocks);
   fprintf(stdout, "]\n");
 }
 
@@ -254,12 +241,7 @@ void Report_End(int rank, int* clocks, int size) {
  */
 void Report_Exec(int rank, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Execution Event: Logical Clock = [", rank);
-  for(int i = 1; i < size; i++){
-   if(i != (size-1))
-      fprintf(stdout, "%d,", clocks[i]);
-   else
-     fprintf(stdout, "%d", clocks[i]);
-  }
+  Print_Clocks(size, clocks);
   fprintf(stdout,"]\n");
 }
 
@@ -270,12 +252,7 @@ void Report_Exec(int rank, int* clocks, int size) {
  */
 void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Message Received from %d: Message >%s<: Logical Clock = [", rank, sendrank, msg);
-  for(int i = 1; i < size; i++){
-   if(i != (size-1))
-      fprintf(stdout, "%d,", clocks[i]);
-   else
-     fprintf(stdout, "%d", clocks[i]);
-  }
+  Print_Clocks(size, clocks);
   fprintf(stdout,"]\n");
 }
 
@@ -286,37 +263,56 @@ void Report_Rec(int rank, int sendrank, char* msg, int* clocks, int size) {
  */
 void Report_Send(int rank, int receiverank, char* msg, int* clocks, int size) {
   fprintf(stdout, "\t[%d]: Message Send to %d: Message >%s<: Logical Clock = [", rank, receiverank, msg);
-  for(int i = 1; i < size; i++){
-   if(i != (size-1))
-      fprintf(stdout, "%d,", clocks[i]);
-   else
-     fprintf(stdout, "%d", clocks[i]);
-  }
+  Print_Clocks(size, clocks);
   fprintf(stdout,"]\n");
 }
 
+
 /*
- * Serialize_Event
- * Given an Event struct, serialize it into a char*
- * (serial) with discovered length (len). Serial
- * must have memory allocated already [300].
+ * Manager
+ * 
+ * execution instruction for the
+ * manager of the process simulation
  */
-void Serialize_Event(struct Event e, char* serial, int* len) {
-  sprintf(serial, "%d|", e.type);
-  int index = 2;
-  if(e.type == 0) {//EXEC "type|sender"
-    sprintf(serial+index, "%d\0", e.sender);
-    index += Digits(e.sender) + 1;
+void Manager() {
+  int sim_size;
+  scanf("%d", &sim_size);
+  fprintf(stdout, "[0]: There are %d processes in the system\n", sim_size);
+
+  //Reads in events and sends events to appropriate processes
+  struct Event e = Read_Event();
+
+  while(e.type == 0 || e.type == 1) {
+    char serial[300];
+    int slen;
+    Serialize_Event(e, serial, &slen);
+
+    if(e.type == 1) {
+      //if send event, send a warning to receiver to prepare
+      MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 55, MPI_COMM_WORLD);  //send warning
+    }
+    MPI_Send(&serial, slen, MPI_CHAR, e.sender, 55, MPI_COMM_WORLD);      //send event
+    //read next instruction in the file
+    e = Read_Event();
+
   }
-  else if(e.type == 1) {//SEND "type|sender|receiver|message"
-    sprintf(serial+index, "%d|", e.sender);
-    index += Digits(e.sender) + 1;
-    sprintf(serial+index, "%d|", e.receiver);
-    index += Digits(e.receiver) + 1;
-    sprintf(serial+index, "%s\0", e.msg);
-    index += strlen(e.msg) + 1;
+  //SIMULATION ENDING
+  sleep(1);
+  //send out the 'quit' messages
+  for(int p = 1; p < sim_size+1; p++) {
+    char end_serial[4] = "end\0";
+    MPI_Send(&end_serial, 4, MPI_CHAR, p, 55, MPI_COMM_WORLD);
   }
-  *len = index;
+  //wait for processes to wrap up execution
+  MPI_Barrier(MPI_COMM_WORLD);
+  //print the ending vector clocks times
+  fprintf(stdout, "[0]: Simulation ending\n");
+  for(int p = 1; p < sim_size+1; p++) {
+    int* lclocks = Create_Clocks(sim_size+1);
+    MPI_Status status;
+    MPI_Recv(lclocks, sim_size+1, MPI_INT, p, 70, MPI_COMM_WORLD, &status);
+    Report_End(p, lclocks, sim_size+1);
+  }
 }
 
 /*
@@ -340,25 +336,22 @@ void Sim_Process(int rank, int size) {
     
     if(e.type == 0) {
       //Exec Intruction Recieved
-      clocks[rank-1]++;
-      Report_Exec(rank-1, clocks, size);
+      clocks[rank]++;
+      Report_Exec(rank, clocks, size);
     }
     else if(e.type == 1) {//SEND
       if(rank == e.sender) {
         //if current process is the sender (received message from manager)
-	//TODO: Increment clock value
-	clocks[rank-1]++;
-        Report_Send(rank-1, e.receiver, e.msg, clocks, size);
+	clocks[rank]++;
+        Report_Send(rank, e.receiver, e.msg, clocks, size);
 
         char serial[300];
         int slen;
         Serialize_Event(e, serial, &slen);
-	
-
-	//TODO: pass the clock array
+	//pass the clock array
 	MPI_Send(clocks, size, MPI_INT, e.receiver, 70, MPI_COMM_WORLD);
         //pass message:
-        MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
+        MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);
       } 
       else {
         //if current process is the receiver (received message from sender)
@@ -366,11 +359,13 @@ void Sim_Process(int rank, int size) {
         //Wait for message from actual sender:
 	MPI_Recv(tmpclocks, size, MPI_INT, e.sender, 70, MPI_COMM_WORLD, &status);
 	clocks = Update_Clocks(tmpclocks, clocks, size);
+	free(tmpclocks);
 	
         MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
         e = Deserialize_Event(input);
-        
-        Report_Rec(rank-1, e.sender, e.msg, clocks, size);
+
+	clocks[rank]++;
+        Report_Rec(rank, e.sender, e.msg, clocks, size);
       }
     }
     else if(e.type == 2) {//END
