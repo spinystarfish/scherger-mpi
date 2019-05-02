@@ -133,7 +133,7 @@ int main(int argc, char* argv[]){
           Serialize_Event(e, serial, &slen);
 
           //pass your clocks
-          MPI_Send(&temp, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
+          MPI_Send(&clocks, size-1, MPI_INT, e.receiver, 30, MPI_COMM_WORLD);
           //pass message:
           MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);//send event
         } 
