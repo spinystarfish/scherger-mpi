@@ -17,7 +17,9 @@ LIBS =
 RM = /bin/rm
 RMFLAGS = -f
 
-all: lamport vector
+EXE = lamport vector
+
+all: $(EXE)
 
 lamport: lamport.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
