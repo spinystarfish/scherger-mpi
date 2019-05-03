@@ -342,14 +342,14 @@ void Sim_Process(int rank, int size) {
     else if(e.type == 1) {//SEND
       if(rank == e.sender) {
         //if current process is the sender (received message from manager)
-	clocks[rank]++;
+        clocks[rank]++;
         Report_Send(rank, e.receiver, e.msg, clocks, size);
 
         char serial[300];
         int slen;
         Serialize_Event(e, serial, &slen);
-	//pass the clock array
-	MPI_Send(clocks, size, MPI_INT, e.receiver, 70, MPI_COMM_WORLD);
+        //pass the clock array
+        MPI_Send(clocks, size, MPI_INT, e.receiver, 70, MPI_COMM_WORLD);
         //pass message:
         MPI_Send(&serial, slen, MPI_CHAR, e.receiver, 60, MPI_COMM_WORLD);
       } 
@@ -357,14 +357,14 @@ void Sim_Process(int rank, int size) {
         //if current process is the receiver (received message from sender)
         int* tmpclocks = Create_Clocks(size);
         //Wait for message from actual sender:
-	MPI_Recv(tmpclocks, size, MPI_INT, e.sender, 70, MPI_COMM_WORLD, &status);
-	clocks = Update_Clocks(tmpclocks, clocks, size);
-	free(tmpclocks);
+        MPI_Recv(tmpclocks, size, MPI_INT, e.sender, 70, MPI_COMM_WORLD, &status);
+        clocks = Update_Clocks(tmpclocks, clocks, size);
+        free(tmpclocks);
 	
         MPI_Recv(&input, 300, MPI_CHAR, e.sender, 60, MPI_COMM_WORLD, &status);
         e = Deserialize_Event(input);
 
-	clocks[rank]++;
+        clocks[rank]++;
         Report_Rec(rank, e.sender, e.msg, clocks, size);
       }
     }
